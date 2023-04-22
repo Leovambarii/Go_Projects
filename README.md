@@ -12,3 +12,8 @@ It was created as an introduction to the Go and CLI language included in [this y
 This is a command-line interface for managing a todo list. It allows you to add, complete, and delete tasks, as well as list all current tasks.
 
 It was created as an introduction to the Go and CLI language included in [this youtube video](https://youtu.be/j1CXoOQXbco).
+
+# Project 3: booking
+This is a command-line application in Go that allows users to book tickets for a conference. The application uses the standard input/output to interact with the user and provides feedback on the booking status.
+
+It was created as an introduction course to the Go ncluded in [this youtube video](https://youtu.be/yyUHQIec83I).
