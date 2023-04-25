@@ -43,11 +43,25 @@ const apiEndpoint string = "https://api.spoonacular.com/recipes/findByIngredient
 const apiKey string = "1378ac4213764197b9ed83d4b968af53"
 
 func main() {
+	// Define the flags
 	flagIngredients := flag.String("ingredients", "", "A comma-separated list of ingredients")
 	flagRecipesNumber := flag.Int("numberOfRecipes", 1, "The number of recipes to display")
 
+	// Parse the command line arguments
 	flag.Parse()
 
+	// Check for errors in the flag values
+	if *flagIngredients == "" {
+		fmt.Println("Error: You must provide a list of ingredients")
+		return
+	}
+
+	if *flagRecipesNumber <= 0 {
+		fmt.Println("Error: The number of recipes must be greater than zero")
+		return
+	}
+
+	// Create string parameters for url request
 	apiKeyUrl := fmt.Sprintf("apiKey=%s", apiKey)
 	ingredientsParameter := fmt.Sprintf("ingredients=%s", *flagIngredients)
 	numberRecipesParameter := fmt.Sprintf("number=%d", *flagRecipesNumber)
@@ -55,18 +69,21 @@ func main() {
 
 	url := fmt.Sprintf("%s?%s&%s&%v&%v", apiEndpoint, apiKeyUrl, ingredientsParameter, numberRecipesParameter, rankingParameter)
 
+	// Get recipes from API
 	err, recipes := getRecipes(url)
 	if err != nil {
 		fmt.Printf("Error getting recipes: %v", err)
 		return
 	}
 
+	// Get nutrition info for recipes
 	err = getNutritionInfo(apiKeyUrl, recipes)
 	if err != nil {
 		fmt.Printf("Error getting nutrition information: %v", err)
 		return
 	}
 
+	// Print recipes with their info in terminal
 	printRecipes(recipes)
 }
 
