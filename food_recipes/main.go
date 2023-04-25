@@ -9,22 +9,35 @@ import (
 	"net/http"
 )
 
-// TODO parsing of first response and then using that to get recipe carbs, proteins and calories from summed ingredients
 type Recipe struct {
 	Id                int          `json:"id"`
 	Title             string       `json:"title"`
 	UsedIngredients   []Ingredient `json:"usedIngredients"`
 	MissedIngredients []Ingredient `json:"missedIngredients"`
-	Carbs             float64      `json:"carbs"`
-	Proteins          float64      `json:"protein"`
-	Calories          float64      `json:"calories"`
+	Carbs             Nutrient     `json:"carbs"`
+	Proteins          Nutrient     `json:"protein"`
+	Calories          Nutrient     `json:"calories"`
 }
 
 type Ingredient struct {
 	Id     int     `json:"id"`
 	Name   string  `json:"name"`
-	Amount float64 `json:"amount"`
+	Amount float32 `json:"amount"`
 	Unit   string  `json:"unit"`
+}
+
+type Nutrient struct {
+	Name   string  `json:"name"`
+	Amount float32 `json:"amount"`
+	Unit   string  `json:"unit"`
+}
+
+type Nutrition struct {
+	Nutrients []Nutrient `json:"nutrients"`
+}
+
+type NutritionInfo struct {
+	Nutrition `json:"nutrition"`
 }
 
 const apiEndpoint string = "https://api.spoonacular.com/recipes/findByIngredients"
@@ -48,90 +61,86 @@ func main() {
 
 	response, err := http.Get(url)
 	if err != nil {
-		log.Printf("Could not make request: %v", err)
+		log.Printf("Could not make request: %v\n", err)
 		return
 	}
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		fmt.Printf("Could not read response body. %v", err)
+		fmt.Printf("Could not read response body. %v\n", err)
 	}
 
 	var recipes []Recipe
 	err = json.Unmarshal(body, &recipes)
 	if err != nil {
-		fmt.Printf("Could not unmarshal response body. %v", err)
+		fmt.Printf("Could not unmarshal response body. %v\n", err)
 	}
 
-	for _, recipe := range recipes {
-		url = fmt.Sprintf("https://api.spoonacular.com/recipes/%d/information?%s&includeNutrition=true", recipe.Id, apiKeyUrl)
+	for i := range recipes {
+		url = fmt.Sprintf("https://api.spoonacular.com/recipes/%d/information?%s&includeNutrition=true", recipes[i].Id, apiKeyUrl)
 		response, err = http.Get(url)
 		if err != nil {
-			log.Printf("Could not make request: %v", err)
-			return
+			log.Printf("Could not make request: %v\n", err)
+			continue
 		}
 		defer response.Body.Close()
 
 		body, err = ioutil.ReadAll(response.Body)
 		if err != nil {
-			fmt.Printf("Could not read response body. %v", err)
+			fmt.Printf("Could not read response body. %v\n", err)
+			continue
 		}
 
-		var data struct {
-			Nutrition struct {
-				Nutrients []struct {
-					Name   string
-					Amount float64
-					Unit   string
-				}
-			}
-		}
-		if err := json.Unmarshal(body, &data); err != nil {
-			fmt.Printf("Could not Unmarshal response body. %v", err)
+		var nutritions NutritionInfo
+		err = json.Unmarshal(body, &nutritions)
+		if err != nil {
+			fmt.Printf("Could not unmarshal nutrition information. %v\n", err)
+			continue
 		}
 
-		for _, nutrient := range data.Nutrition.Nutrients { // TODO przerobić aby tylko wyłuskać te 3 informacje
+		nutrients := nutritions.Nutrition.Nutrients
+
+		for _, nutrient := range nutrients {
 			switch nutrient.Name {
 			case "Calories":
-				recipe.Calories = nutrient.Amount
+				recipes[i].Calories = nutrient
 			case "Carbohydrates":
-				recipe.Carbs = nutrient.Amount
+				recipes[i].Carbs = nutrient
 			case "Protein":
-				recipe.Proteins = nutrient.Amount
+				recipes[i].Proteins = nutrient
 			}
 		}
-
-		// err = ioutil.WriteFile(jsonFileRecipe, body, 0644)
-		// if err != nil {
-		// 	fmt.Printf("Could not write response to file. %v", err)
-		// 	return
-		// }
-		// fmt.Printf("Response written to %s\n", jsonFileRecipe)
 	}
 
 	printRecipes(recipes)
-
-	// err = ioutil.WriteFile(jsonFileRecipes, body, 0644)
-	// if err != nil {
-	// 	fmt.Printf("Could not write response to file. %v", err)
-	// 	return
-	// }
-	// fmt.Printf("Response written to %s\n", jsonFileRecipes)
 }
 
 func printRecipes(recipes []Recipe) {
 	for _, recipe := range recipes {
-		fmt.Printf("Recipe: %s\n", recipe.Title)
-		fmt.Printf("Carbs=  Proteins= Calories=")
-		fmt.Println("Used Ingredients:")
+		fmt.Println("+=======================================+")
+		fmt.Printf("+ %s\n", recipe.Title)
+		fmt.Println("+---------------------------------------+")
+
+		fmt.Printf("+ %s = %.2f%s\n", recipe.Carbs.Name, recipe.Carbs.Amount, recipe.Carbs.Unit)
+		fmt.Printf("+ %s = %.2f%s\n", recipe.Calories.Name, recipe.Calories.Amount, recipe.Calories.Unit)
+		fmt.Printf("+ %s = %.2f%s\n", recipe.Proteins.Name, recipe.Proteins.Amount, recipe.Proteins.Unit)
+
+		fmt.Println("+---------------------------------------+")
+
+		fmt.Println("+ Used Ingredients:")
 		for _, usedIngredient := range recipe.UsedIngredients {
-			fmt.Printf("- %s\n", usedIngredient.Name)
+			fmt.Printf("+ %.2f %s %s\n", usedIngredient.Amount, usedIngredient.Unit, usedIngredient.Name)
 		}
-		fmt.Println("Missing Ingredients:")
+
+		fmt.Println("+---------------------------------------+")
+
+		fmt.Println("+ Missing Ingredients:")
 		for _, missedIngredient := range recipe.MissedIngredients {
-			fmt.Printf("- %s\n", missedIngredient.Name)
+			fmt.Printf("+ %.2f %s %s\n", missedIngredient.Amount, missedIngredient.Unit, missedIngredient.Name)
 		}
-		fmt.Println("-----------------------------")
+
+		fmt.Println("+=======================================+\n ")
+
 	}
 }
