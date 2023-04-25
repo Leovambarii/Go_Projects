@@ -1,0 +1,31 @@
+As a young entrepreneur, you want to create a new startup in the food and health space.
+You want to create a product that would help people avoid wasting food while maintaining 
+a healthy lifestyle. Your task is to write a program that given a list of ingredients 
+in the fridge would generate a list of meals that can be prepared with 
+a minimal number of missing ingredients. 
+
+Each meal should be displayed with its name, list of ingredients already present, 
+list of missing ingredients, carbs, proteins and calories. 
+The formatting of the output is up to you.
+
+You can use `https://spoonacular.com/food-api/` or any other API.
+
+We want you to write a CLI application, that accepts two parameters:
+
+- `--ingredients`, which will be followed by a comma-separated list of ingredients. 
+(eg. `-ingredients=tomatoes,eggs,pasta`)
+
+- `--numberOfRecipes`, which will let the user specify the maximum 
+number of recipes they'd like to get (eg. `--numberOfRecipes=5`)
+
+So an example call of your CLI application could look like: 
+`./recipeFinder --ingredients=tomatoes,eggs,pasta --numberOfRecipes=5`
+
+As a next step please store the list of ingredients 
+(already present and missing separately) and resulting meals 
+data in a local database of your choosing and use it instead 
+of the API if someone wants to find meals with the same input as before.
+
+Hint: for parsing command line arguments, you may find 
+this library useful https://github.com/spf13/cobra. 
+It is not required to use it, but it can be very helpful.
