@@ -50,7 +50,7 @@ const dataSourceName string = "root:password@tcp(localhost)/food_recipes"
 
 // To build and run in Windows:
 // go build -o recipeFinder.exe main.go
-// recipeFinder.exe --ingredients=tomatoes,eggs,pasta --numberOfRecipes=3
+// recipeFinder.exe --ingredients=tomatoes,eggs,pasta --numberOfRecipes=1
 
 func main() {
 	// Define the flags
@@ -197,15 +197,15 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 		return fmt.Errorf("Could not get id of inserted row: %v\n", err)
 	}
 
-	// Prepare the SQL statement insert recipe data
-	stmt, err = db.Prepare("INSERT INTO recipe (RecipeId, ArgumentId, Title) VALUES (?, ?, ?)")
-	if err != nil {
-		return fmt.Errorf("Could not prepare statement: %v\n", err)
-	}
-	defer stmt.Close()
-
 	// Loop through the recipe slice and insert each recipe into the database
 	for _, recipe := range recipes {
+		// Prepare the SQL statement insert recipe data
+		stmt, err = db.Prepare("INSERT INTO recipe (RecipeId, ArgumentId, Title) VALUES (?, ?, ?)")
+		if err != nil {
+			return fmt.Errorf("Could not prepare statement: %v\n", err)
+		}
+		defer stmt.Close()
+
 		// Insert recipe data
 		result, err := stmt.Exec(recipe.Id, argumentInputID, recipe.Title)
 		if err != nil {

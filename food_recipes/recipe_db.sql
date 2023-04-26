@@ -27,7 +27,7 @@ CREATE TABLE `MissingIngredient`(
     `RecipeId` int UNSIGNED NOT NULL,
     `Name` text NOT NULL,
     `Amount` double(8, 2) NOT NULL,
-    `Unit` text NOT NULL,
+    `Unit` text,
     PRIMARY KEY (`Id`),
     KEY `missingingredient_recipeid_foreign` (`RecipeId`),
     CONSTRAINT `missingingredient_recipeid_frg` FOREIGN KEY (`RecipeId`) REFERENCES `Recipe` (`Id`)
@@ -39,10 +39,10 @@ CREATE TABLE `UsedIngredient`(
     `RecipeId` int UNSIGNED NOT NULL,
     `Name` text NOT NULL,
     `Amount` double(8, 2) NOT NULL,
-    `Unit` text NOT NULL,
+    `Unit` text,
     PRIMARY KEY (`Id`),
     KEY `usedingredient_recipeid_foreign` (`RecipeId`),
-    CONSTRAINT `usedingredient_recipeid_frg` FOREIGN KEY (`Id`) REFERENCES `Recipe` (`Id`)
+    CONSTRAINT `usedingredient_recipeid_frg` FOREIGN KEY (`RecipeId`) REFERENCES `Recipe` (`Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `Nutrients`(
