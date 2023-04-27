@@ -134,6 +134,7 @@ func main() {
 }
 
 // sortIngredients sorts a comma-separated string of ingredients and returns a new comma-separated sorted string.
+// This assures that same inputs of ingredients with different order be recognized as the same one.
 //
 // Args:
 //
@@ -156,8 +157,8 @@ func sortIngredients(ingredients string) string {
 	return sortedIngredientsString
 }
 
-// checkForInputInDatabase searches the argumentinput table in the database for a row
-// that has matching IngredientText and RecipesNumber - values given by the user in the argument flags.
+// checkForInputInDatabase searches the input table in the MySQL database for a row that has matching IngredientText and RecipesNumber - values given by the user in the argument flags.
+// It returns an error if any occurred and the Id value of the matching row, or -1 if no row was found/error occurred.
 //
 // Args:
 //
@@ -202,7 +203,7 @@ func checkForInputInDatabase(ingredients string, recipesNumber int) (error, int)
 	}
 }
 
-// getDataFromDatabase retrieces recipe data from a database based on the input id.
+// getDataFromDatabase function retrieves recipe data from the MySQL database based on the input id.
 // If successful, it returns a nil error and a slice of Recipe structs.
 //
 // Args:
@@ -491,7 +492,7 @@ func getRecipes(url string) (error, []Recipe) {
 	return nil, recipes
 }
 
-// getNutritionInfo retrieves nutrition information for a list of recipes
+// getNutritionInfo retrieves nutrition information for a slice of recipes
 // using the Spoonacular API.
 //
 // It makes an API request for each recipe in the given list, and updates
