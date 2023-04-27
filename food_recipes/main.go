@@ -18,9 +18,9 @@ type Recipe struct {
 	Title             string       `json:"title"`
 	UsedIngredients   []Ingredient `json:"usedIngredients"`
 	MissedIngredients []Ingredient `json:"missedIngredients"`
-	Carbs             Nutrient     `json:"carbs"`
-	Proteins          Nutrient     `json:"protein"`
-	Calories          Nutrient     `json:"calories"`
+	Carbs             Nutrient
+	Proteins          Nutrient
+	Calories          Nutrient
 }
 
 type Ingredient struct {
@@ -45,25 +45,22 @@ type NutritionInfo struct {
 }
 
 const apiEndpoint string = "https://api.spoonacular.com/recipes/findByIngredients"
-
-// const apiKey string = "1378ac4213764197b9ed83d4b968af53"
 const apiKey string = "5efb2ccd5e6042739782947221c8332b"
+const dataDriverName string = "mysql"
 const dataSourceName string = "root:password@tcp(localhost)/food_recipes"
-
-// To build and run in Windows:
-// go build -o recipeFinder.exe main.go
-// recipeFinder.exe --ingredients="tomatoes,eggs,pasta" --numberOfRecipes=1
 
 func main() {
 	// Define the flags
-	flagIngredients := flag.String("ingredients", "", "A comma-separated list of ingredients")
-	flagRecipesNumber := flag.Int("numberOfRecipes", 1, "The number of recipes to display")
+	flagIngredientsAddress := flag.String("ingredients", "", "A comma-separated list of ingredients")
+	flagRecipesNumberAddress := flag.Int("numberOfRecipes", 1, "The number of recipes to display")
 
-	// Parse the command line arguments
+	// Parse the command line flag arguments
 	flag.Parse()
 
-	recipesNumber := *flagRecipesNumber
-	sortedIngredients := sortIngredients(*flagIngredients)
+	recipesNumber := *flagRecipesNumberAddress
+	sortedIngredients := sortIngredients(*flagIngredientsAddress)
+
+	// Print input information
 	fmt.Printf("Ingredients: %s\n", sortedIngredients)
 	fmt.Printf("Recipes number: %d\n\n", recipesNumber)
 
@@ -73,7 +70,7 @@ func main() {
 		return
 	}
 
-	if recipesNumber <= 0 {
+	if recipesNumber < 1 {
 		fmt.Println("Error: The number of recipes must be greater than zero")
 		return
 	}
@@ -85,6 +82,7 @@ func main() {
 		return
 	}
 
+	// Get information from database if similar input exists or get information from api
 	if foundId > 0 {
 		fmt.Printf("Input already exists in the database\n\n")
 
@@ -98,7 +96,7 @@ func main() {
 		// Print recipes with their info in terminal
 		printRecipes(recipes)
 	} else {
-		fmt.Println("Getting information from API")
+		fmt.Printf("Getting information from API\n\n")
 
 		// Create string parameters for url request
 		apiKeyUrl := fmt.Sprintf("apiKey=%s", apiKey)
@@ -106,6 +104,7 @@ func main() {
 		numberRecipesParameter := fmt.Sprintf("number=%d", recipesNumber)
 		rankingParameter := "ranking=2"
 
+		// Create request url
 		url := fmt.Sprintf("%s?%s&%s&%v&%v", apiEndpoint, apiKeyUrl, ingredientsParameter, numberRecipesParameter, rankingParameter)
 
 		// Get recipes from API
@@ -132,9 +131,17 @@ func main() {
 			return
 		}
 	}
-
 }
 
+// sortIngredients sorts a comma-separated string of ingredients and returns a new comma-separated sorted string.
+//
+// Args:
+//
+//	ingredients string: A comma-separated string of ingredients.
+//
+// Returns:
+//
+//	string: A comma-separated string of ingredients in sorted order.
 func sortIngredients(ingredients string) string {
 	// Split the comma-separated string of ingredients into a slice of strings
 	ingredientsSlice := strings.Split(ingredients, ",")
@@ -145,30 +152,40 @@ func sortIngredients(ingredients string) string {
 	// Create a comma-separated string from the sorted slice of strings
 	sortedIngredientsString := strings.Join(ingredientsSlice, ",")
 
+	// Return the sorted string of ingredients
 	return sortedIngredientsString
 }
 
-// Database related functions
-
+// checkForInputInDatabase searches the argumentinput table in the database for a row
+// that has matching IngredientText and RecipesNumber - values given by the user in the argument flags.
+//
+// Args:
+//
+//	ingredients string: The IngredientText value to match.
+//	recipesNumber int: The RecipesNumber value to match.
+//
+// Returns:
+//
+//	error, int: An error if any occured and the Id value of the matching row, or -1 if no row was found/error occured.
 func checkForInputInDatabase(ingredients string, recipesNumber int) (error, int) {
 	// Open the database connection
-	db, err := sql.Open("mysql", dataSourceName)
+	db, err := sql.Open(dataDriverName, dataSourceName)
 	if err != nil {
-		return fmt.Errorf("Could not open database: %v\n", err), -1
+		return fmt.Errorf("could not open database: %v", err), -1
 	}
 	defer db.Close()
 
 	// Prepare the SQL statement to select rows with matching IngredientText and RecipesNumber
 	stmt, err := db.Prepare("SELECT Id FROM argumentinput WHERE IngredientText = ? AND RecipesNumber = ?")
 	if err != nil {
-		return fmt.Errorf("Could not prepare statement: %v\n", err), -1
+		return fmt.Errorf("could not prepare statement: %v", err), -1
 	}
 	defer stmt.Close()
 
 	// Execute the statement with the values passed as arguments
 	rows, err := stmt.Query(ingredients, recipesNumber)
 	if err != nil {
-		return fmt.Errorf("Could not execute statement: %v\n", err), -1
+		return fmt.Errorf("could not execute statement: %v", err), -1
 	}
 	defer rows.Close()
 
@@ -177,7 +194,7 @@ func checkForInputInDatabase(ingredients string, recipesNumber int) (error, int)
 		var id int
 		err = rows.Scan(&id)
 		if err != nil {
-			return fmt.Errorf("Could not scan row: %v\n", err), -1
+			return fmt.Errorf("could not scan row: %v", err), -1
 		}
 		return nil, id
 	} else {
@@ -185,11 +202,21 @@ func checkForInputInDatabase(ingredients string, recipesNumber int) (error, int)
 	}
 }
 
+// getDataFromDatabase retrieces recipe data from a database based on the input id.
+// If successful, it returns a nil error and a slice of Recipe structs.
+//
+// Args:
+//
+//	InputId int: The id of row with similar input stored in database used to query recipe data from the database.
+//
+// Returns:
+//
+//	error, []Recipe: An error if any occured and a slice of Recipe structs.
 func getDataFromDatabase(InputId int) (error, []Recipe) {
 	var recipes []Recipe
 
 	// Open the database connection
-	db, err := sql.Open("mysql", dataSourceName)
+	db, err := sql.Open(dataDriverName, dataSourceName)
 	if err != nil {
 		return fmt.Errorf("Could not open database: %v\n", err), recipes
 	}
@@ -209,6 +236,7 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 	}
 	defer rows.Close()
 
+	// Loop through all rows of recipes
 	for rows.Next() {
 		var recipe Recipe
 		var id int
@@ -231,6 +259,7 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 		}
 		defer res.Close()
 
+		// Loop through all rows of used ingrediens
 		for res.Next() {
 			var usedIngredient Ingredient
 			err := res.Scan(&usedIngredient.Id, &usedIngredient.Name, &usedIngredient.Amount, &usedIngredient.Unit)
@@ -255,6 +284,7 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 		}
 		defer res.Close()
 
+		// Loop through all rows of missing ingrediens
 		for res.Next() {
 			var missingIngredient Ingredient
 			err := res.Scan(&missingIngredient.Id, &missingIngredient.Name, &missingIngredient.Amount, &missingIngredient.Unit)
@@ -279,6 +309,7 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 		}
 		defer res.Close()
 
+		// Loop through all rows of nutrients
 		for res.Next() {
 			var nutrient Nutrient
 			err := res.Scan(&nutrient.Name, &nutrient.Amount, &nutrient.Unit)
@@ -296,18 +327,30 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 			}
 		}
 
-		// Append the recipe to the recipes slice
+		// Append the recipe with complete data to the recipes slice
 		recipes = append(recipes, recipe)
 	}
 
 	return nil, recipes
 }
 
+// storeRecipesInDatabase stores recipe slice data in the database.
+// If successful, it returns a nil error.
+//
+// Args:
+//
+//	ingredients string: the ingredients that were given by the user in argument flag.
+//	recipesNumber int: the number of recipes that were given by the user in argument flag.
+//	recipes []Recipe: a slice of Recipe structs containing recipe data to be cached
+//
+// Returns:
+//
+//	error: an error if any step of caching fails, or nil if successful
 func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Recipe) error {
 	fmt.Println("Caching the data from API into local database...")
 
 	// Open the database connection
-	db, err := sql.Open("mysql", dataSourceName)
+	db, err := sql.Open(dataDriverName, dataSourceName)
 	if err != nil {
 		return fmt.Errorf("Could not open database: %v\n", err)
 	}
@@ -316,7 +359,7 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 	// Prepare the SQL statement insert input data
 	stmt, err := db.Prepare("INSERT INTO argumentinput (IngredientText, RecipesNumber) VALUES (?, ?)")
 	if err != nil {
-		return fmt.Errorf("Could not prepare statement: %v\n", err)
+		return fmt.Errorf("Could not prepare statement insert input data: %v\n", err)
 	}
 	defer stmt.Close()
 
@@ -329,7 +372,7 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 	// Get the id of the inserted row
 	argumentInputID, err := result.LastInsertId()
 	if err != nil {
-		return fmt.Errorf("Could not get id of inserted row: %v\n", err)
+		return fmt.Errorf("Could not get id of inserted row input data: %v\n", err)
 	}
 
 	// Loop through the recipe slice and insert all data from each recipe into the database
@@ -337,7 +380,7 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 		// Prepare the SQL statement insert recipe data
 		stmt, err = db.Prepare("INSERT INTO recipe (RecipeId, ArgumentId, Title) VALUES (?, ?, ?)")
 		if err != nil {
-			return fmt.Errorf("Could not prepare statement: %v\n", err)
+			return fmt.Errorf("Could not prepare statement insert recipe data: %v\n", err)
 		}
 		defer stmt.Close()
 
@@ -350,7 +393,7 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 		// Get the id of the inserted row
 		recipeID, err := result.LastInsertId()
 		if err != nil {
-			return fmt.Errorf("Could not get id of inserted row: %v\n", err)
+			return fmt.Errorf("Could not get id of inserted row insert recipe data: %v\n", err)
 		}
 
 		// Prepare the SQL statement insert nutrients data
@@ -407,64 +450,100 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 				return fmt.Errorf("Could not insert missingingredient data: %v\n", err)
 			}
 		}
-
 	}
 
 	return nil
 }
 
-// API related functions
-
+// getRecipes retrieves recipes from a given URL.
+// It makes a GET request to the specified URL and unmarshals the response body
+// into a slice of Recipe structs. If any errors occur during the process, an
+// error is returned along with a nil slice of Recipe structs.
+//
+// Args:
+//
+//	url string: The URL to retrieve the recipes from.
+//
+// Returns:
+//
+//	error, []Recipe: An error, if any occurred and a slice of Recipe structs.
 func getRecipes(url string) (error, []Recipe) {
 	var recipes []Recipe
 
+	// Make a GET request to the given URL
 	response, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("Could not make request: %v\n", err), recipes
+		return fmt.Errorf("could not make request: %v", err), recipes
 	}
 	defer response.Body.Close()
 
+	// Read the response body
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("Could not read response body. %v\n", err), recipes
+		return fmt.Errorf("could not read response body: %v", err), recipes
 	}
 
-	err = json.Unmarshal(body, &recipes)
-	if err != nil {
-		return fmt.Errorf("Could not unmarshal response body. %v\n", err), recipes
+	// Unmarshal the response body into a slice of Recipe structs
+	if err := json.Unmarshal(body, &recipes); err != nil {
+		return fmt.Errorf("could not unmarshal response body: %v", err), recipes
 	}
 
 	return nil, recipes
 }
 
+// getNutritionInfo retrieves nutrition information for a list of recipes
+// using the Spoonacular API.
+//
+// It makes an API request for each recipe in the given list, and updates
+// the Calories, Carbs, and Proteins fields of each recipe with the corresponding
+// nutrient data from the API response.
+//
+// Args:
+//
+//	apiKeyUrl string: The Spoonacular API key and any additional query parameters.
+//	recipes []Recipe: The list of Recipe structs to retrieve nutrition information for.
+//
+// Returns:
+//
+//	error: An error, if any occurred during the process.
 func getNutritionInfo(apiKeyUrl string, recipes []Recipe) error {
+	// Loop through each recipe in the list
 	for i := range recipes {
+		// Construct the API URL for this recipe
 		url := fmt.Sprintf("https://api.spoonacular.com/recipes/%d/information?%s&includeNutrition=true", recipes[i].Id, apiKeyUrl)
+
+		// Make a GET request to the API
 		response, err := http.Get(url)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 		defer response.Body.Close()
 
+		// Read the response body
 		body, err := ioutil.ReadAll(response.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read response body: %v", err)
 		}
 
+		// Unmarshal the response body into a NutritionInfo struct
 		var nutritions NutritionInfo
 		err = json.Unmarshal(body, &nutritions)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal nutrition information: %v", err)
 		}
 
+		// Map the nutrient names to their corresponding Recipe struct fields
 		var nutrientMap = map[string]*Nutrient{
 			"Calories":      &recipes[i].Calories,
 			"Carbohydrates": &recipes[i].Carbs,
 			"Protein":       &recipes[i].Proteins,
 		}
 
+		// Update the Recipe struct fields with the nutrient values from the API response
 		for _, nutrient := range nutritions.Nutrition.Nutrients {
+			// Check if the nutrient name is in the nutrientMap
 			if nutrientPtr, ok := nutrientMap[nutrient.Name]; ok {
+				// If the nutrient name is in the nutrientMap, update the corresponding Recipe struct field
 				*nutrientPtr = nutrient
 			}
 		}
@@ -473,32 +552,50 @@ func getNutritionInfo(apiKeyUrl string, recipes []Recipe) error {
 	return nil
 }
 
-// Print information stored in given Recipe slice
+// printRecipes prints the information stored in a given slice of Recipe structs.
+//
+// Args:
+//
+//	recipes []Recipe: A slice of Recipe structs to print.
 func printRecipes(recipes []Recipe) {
-	for _, recipe := range recipes {
-		fmt.Println("+=======================================+")
-		fmt.Printf("+ %s\n", recipe.Title)
-		fmt.Println("+---------------------------------------+")
+	boldLine := "+=================================================+\n"
+	separatingLine := "+-------------------------------------------------+\n"
 
+	// Loop through each recipe in the slice
+	for _, recipe := range recipes {
+		// Print recipe title
+		fmt.Printf("%s", boldLine)
+		fmt.Printf("+ %s\n", recipe.Title)
+		fmt.Printf("%s", separatingLine)
+
+		// Print nutrition information
 		fmt.Printf("+ %s = %.2f%s\n", recipe.Carbs.Name, recipe.Carbs.Amount, recipe.Carbs.Unit)
 		fmt.Printf("+ %s = %.2f%s\n", recipe.Proteins.Name, recipe.Proteins.Amount, recipe.Proteins.Unit)
 		fmt.Printf("+ %s = %.2f%s\n", recipe.Calories.Name, recipe.Calories.Amount, recipe.Calories.Unit)
 
-		fmt.Println("+---------------------------------------+")
-
+		// Print used ingredients
+		fmt.Printf("%s", separatingLine)
 		fmt.Println("+ Used Ingredients:")
-		for _, usedIngredient := range recipe.UsedIngredients {
-			fmt.Printf("+ %.2f %s %s\n", usedIngredient.Amount, usedIngredient.Unit, usedIngredient.Name)
+		if len(recipe.UsedIngredients) > 0 {
+			for _, usedIngredient := range recipe.UsedIngredients {
+				fmt.Printf("+ %.2f %s %s\n", usedIngredient.Amount, usedIngredient.Unit, usedIngredient.Name)
+			}
+		} else {
+			fmt.Println("+ Nothing was used!")
 		}
 
-		fmt.Println("+---------------------------------------+")
-
+		// Print missing ingredients
+		fmt.Printf("%s", separatingLine)
 		fmt.Println("+ Missing Ingredients:")
-		for _, missedIngredient := range recipe.MissedIngredients {
-			fmt.Printf("+ %.2f %s %s\n", missedIngredient.Amount, missedIngredient.Unit, missedIngredient.Name)
+		if len(recipe.MissedIngredients) > 0 {
+			for _, missedIngredient := range recipe.MissedIngredients {
+				fmt.Printf("+ %.2f %s %s\n", missedIngredient.Amount, missedIngredient.Unit, missedIngredient.Name)
+			}
+		} else {
+			fmt.Println("+ Nothing is missing!")
 		}
 
-		fmt.Println("+=======================================+\n ")
-
+		// Print separator between recipes
+		fmt.Printf("%s\n", boldLine)
 	}
 }
