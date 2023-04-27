@@ -45,12 +45,14 @@ type NutritionInfo struct {
 }
 
 const apiEndpoint string = "https://api.spoonacular.com/recipes/findByIngredients"
-const apiKey string = "1378ac4213764197b9ed83d4b968af53"
+
+// const apiKey string = "1378ac4213764197b9ed83d4b968af53"
+const apiKey string = "5efb2ccd5e6042739782947221c8332b"
 const dataSourceName string = "root:password@tcp(localhost)/food_recipes"
 
 // To build and run in Windows:
 // go build -o recipeFinder.exe main.go
-// recipeFinder.exe --ingredients=tomatoes,eggs,pasta --numberOfRecipes=1
+// recipeFinder.exe --ingredients="tomatoes,eggs,pasta" --numberOfRecipes=1
 
 func main() {
 	// Define the flags
@@ -77,14 +79,24 @@ func main() {
 	}
 
 	// Check for similar input in database
-	err, found := checkForSameInput(sortedIngredients, recipesNumber)
+	err, foundId := checkForInputInDatabase(sortedIngredients, recipesNumber)
 	if err != nil {
 		fmt.Printf("Error checking input in database: %v", err)
 		return
 	}
 
-	if found {
-		fmt.Println("Input already exists in the database")
+	if foundId > 0 {
+		fmt.Printf("Input already exists in the database\n\n")
+
+		// Get data from database
+		err, recipes := getDataFromDatabase(foundId)
+		if err != nil {
+			fmt.Printf("Error getting data from database: %v", err)
+			return
+		}
+
+		// Print recipes with their info in terminal
+		printRecipes(recipes)
 	} else {
 		fmt.Println("Getting information from API")
 
@@ -138,38 +150,161 @@ func sortIngredients(ingredients string) string {
 
 // Database related functions
 
-func checkForSameInput(ingredients string, recipesNumber int) (error, bool) {
+func checkForInputInDatabase(ingredients string, recipesNumber int) (error, int) {
 	// Open the database connection
 	db, err := sql.Open("mysql", dataSourceName)
 	if err != nil {
-		return fmt.Errorf("Could not open database: %v\n", err), false
+		return fmt.Errorf("Could not open database: %v\n", err), -1
 	}
 	defer db.Close()
 
 	// Prepare the SQL statement to select rows with matching IngredientText and RecipesNumber
-	stmt, err := db.Prepare("SELECT IngredientText, RecipesNumber FROM argumentinput WHERE IngredientText = ? AND RecipesNumber = ?")
+	stmt, err := db.Prepare("SELECT Id FROM argumentinput WHERE IngredientText = ? AND RecipesNumber = ?")
 	if err != nil {
-		return fmt.Errorf("Could not prepare statement: %v\n", err), false
+		return fmt.Errorf("Could not prepare statement: %v\n", err), -1
 	}
 	defer stmt.Close()
 
 	// Execute the statement with the values passed as arguments
 	rows, err := stmt.Query(ingredients, recipesNumber)
 	if err != nil {
-		return fmt.Errorf("Could not execute statement: %v\n", err), false
+		return fmt.Errorf("Could not execute statement: %v\n", err), -1
 	}
 	defer rows.Close()
 
 	// Check if any rows were returned
 	if rows.Next() {
-		return nil, true
+		var id int
+		err = rows.Scan(&id)
+		if err != nil {
+			return fmt.Errorf("Could not scan row: %v\n", err), -1
+		}
+		return nil, id
 	} else {
-		return nil, false
+		return nil, -1
 	}
 }
 
+func getDataFromDatabase(InputId int) (error, []Recipe) {
+	var recipes []Recipe
+
+	// Open the database connection
+	db, err := sql.Open("mysql", dataSourceName)
+	if err != nil {
+		return fmt.Errorf("Could not open database: %v\n", err), recipes
+	}
+	defer db.Close()
+
+	// Prepare the SQL statement to select recipe rows with matching InputId
+	stmt, err := db.Prepare("SELECT Id, RecipeId, Title FROM recipe WHERE ArgumentId = ?")
+	if err != nil {
+		return fmt.Errorf("Could not prepare statement select recipe rows: %v\n", err), recipes
+	}
+	defer stmt.Close()
+
+	// Execute the statement with the values passed as arguments
+	rows, err := stmt.Query(InputId)
+	if err != nil {
+		return fmt.Errorf("Could not execute statement select recipe rows: %v\n", err), recipes
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var recipe Recipe
+		var id int
+		err := rows.Scan(&id, &recipe.Id, &recipe.Title)
+		if err != nil {
+			return fmt.Errorf("Could not scan row in select recipe rows: %v\n", err), recipes
+		}
+
+		// Prepare the SQL statement to select used ingredients data with matching id
+		stmt, err := db.Prepare("SELECT IngredientId, Name, Amount, Unit FROM usedingredient WHERE RecipeId = ?")
+		if err != nil {
+			return fmt.Errorf("Could not prepare statement select used ingredients rows: %v\n", err), recipes
+		}
+		defer stmt.Close()
+
+		// Execute the statement with the values passed as arguments
+		res, err := stmt.Query(id)
+		if err != nil {
+			return fmt.Errorf("Could not execute statement select used ingredients rows: %v\n", err), recipes
+		}
+		defer res.Close()
+
+		for res.Next() {
+			var usedIngredient Ingredient
+			err := res.Scan(&usedIngredient.Id, &usedIngredient.Name, &usedIngredient.Amount, &usedIngredient.Unit)
+			if err != nil {
+				return fmt.Errorf("Could not scan row in select used ingredients rows: %v\n", err), recipes
+			}
+
+			recipe.UsedIngredients = append(recipe.UsedIngredients, usedIngredient)
+		}
+
+		// Prepare the SQL statement to select missng ingredients data with matching id
+		stmt, err = db.Prepare("SELECT IngredientId, Name, Amount, Unit FROM missingingredient WHERE RecipeId = ?")
+		if err != nil {
+			return fmt.Errorf("Could not prepare statement select missing ingredients rows: %v\n", err), recipes
+		}
+		defer stmt.Close()
+
+		// Execute the statement with the values passed as arguments
+		res, err = stmt.Query(id)
+		if err != nil {
+			return fmt.Errorf("Could not execute statement select missing ingredients rows: %v\n", err), recipes
+		}
+		defer res.Close()
+
+		for res.Next() {
+			var missingIngredient Ingredient
+			err := res.Scan(&missingIngredient.Id, &missingIngredient.Name, &missingIngredient.Amount, &missingIngredient.Unit)
+			if err != nil {
+				return fmt.Errorf("Could not scan row: in select missing ingredients rows %v\n", err), recipes
+			}
+
+			recipe.MissedIngredients = append(recipe.MissedIngredients, missingIngredient)
+		}
+
+		// Prepare the SQL statement to select nutrients data with matching id
+		stmt, err = db.Prepare("SELECT Name, Amount, Unit FROM nutrients WHERE RecipeId = ?")
+		if err != nil {
+			return fmt.Errorf("Could not prepare statement select nutrients rows: %v\n", err), recipes
+		}
+		defer stmt.Close()
+
+		// Execute the statement with the values passed as arguments
+		res, err = stmt.Query(id)
+		if err != nil {
+			return fmt.Errorf("Could not execute statement select nutrients rows: %v\n", err), recipes
+		}
+		defer res.Close()
+
+		for res.Next() {
+			var nutrient Nutrient
+			err := res.Scan(&nutrient.Name, &nutrient.Amount, &nutrient.Unit)
+			if err != nil {
+				return fmt.Errorf("Could not scan row in select nutrients rows: %v\n", err), recipes
+			}
+
+			switch nutrient.Name {
+			case "Carbohydrates":
+				recipe.Carbs = nutrient
+			case "Protein":
+				recipe.Proteins = nutrient
+			case "Calories":
+				recipe.Calories = nutrient
+			}
+		}
+
+		// Append the recipe to the recipes slice
+		recipes = append(recipes, recipe)
+	}
+
+	return nil, recipes
+}
+
 func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Recipe) error {
-	fmt.Println("Caching the data from API into local database")
+	fmt.Println("Caching the data from API into local database...")
 
 	// Open the database connection
 	db, err := sql.Open("mysql", dataSourceName)
@@ -197,7 +332,7 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 		return fmt.Errorf("Could not get id of inserted row: %v\n", err)
 	}
 
-	// Loop through the recipe slice and insert each recipe into the database
+	// Loop through the recipe slice and insert all data from each recipe into the database
 	for _, recipe := range recipes {
 		// Prepare the SQL statement insert recipe data
 		stmt, err = db.Prepare("INSERT INTO recipe (RecipeId, ArgumentId, Title) VALUES (?, ?, ?)")
@@ -224,6 +359,7 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 			return fmt.Errorf("Could not prepare nutrients statement: %v\n", err)
 		}
 		defer stmt.Close()
+
 		// Insert carbs nutrient data
 		_, err = stmt.Exec(recipeID, recipe.Carbs.Name, recipe.Carbs.Amount, recipe.Carbs.Unit)
 		if err != nil {
@@ -247,21 +383,25 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 		}
 		defer stmt.Close()
 
+		// Insert data of all usedingredients
 		for _, usedIngredient := range recipe.UsedIngredients {
+			// Insert usedigredient data
 			_, err := stmt.Exec(usedIngredient.Id, recipeID, usedIngredient.Name, usedIngredient.Amount, usedIngredient.Unit)
 			if err != nil {
 				return fmt.Errorf("Could not insert usedingredient data: %v\n", err)
 			}
 		}
 
-		// Prepare the SQL statement insert usedingredient data
+		// Prepare the SQL statement insert missingingredient data
 		stmt, err = db.Prepare("INSERT INTO missingingredient (IngredientId, RecipeId, Name, Amount, Unit) VALUES (?, ?, ?, ?, ?)")
 		if err != nil {
 			return fmt.Errorf("Could not prepare missingingredient statement: %v\n", err)
 		}
 		defer stmt.Close()
 
+		// Insert data of all missingingredients
 		for _, missedIngredient := range recipe.MissedIngredients {
+			// Insert missingingredient data
 			_, err := stmt.Exec(missedIngredient.Id, recipeID, missedIngredient.Name, missedIngredient.Amount, missedIngredient.Unit)
 			if err != nil {
 				return fmt.Errorf("Could not insert missingingredient data: %v\n", err)
