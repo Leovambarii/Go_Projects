@@ -64,7 +64,7 @@ It makes a GET request to the specified URL and unmarshals the response body
 into a slice of Recipe structs. If any errors occur during the process, an
 error is returned along with a nil slice of Recipe structs.
 
-## **getNutritionInfo**
+## **getNutritionBulkInfo**
 
 Retrieves nutrition information for a slice of recipes using the Spoonacular API.
 

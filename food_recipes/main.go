@@ -47,10 +47,6 @@ const apiKey string = "5efb2ccd5e6042739782947221c8332b"
 const dataDriverName string = "mysql"
 const dataSourceName string = "root:password@tcp(localhost)/food_recipes"
 
-// TODO Finish the function for bulk recipe information
-// TODO Check recipe nutrition per serving and full
-// TODO Change GetNutritionInfo func to include servings
-
 func main() {
 	// Define the flags
 	flagIngredientsAddress := flag.String("ingredients", "", "A comma-separated list of ingredients")
@@ -598,7 +594,11 @@ func printRecipes(recipes []Recipe) {
 		fmt.Println("+ Used Ingredients:")
 		if len(recipe.UsedIngredients) > 0 {
 			for _, usedIngredient := range recipe.UsedIngredients {
-				fmt.Printf("+ %.2f %s %s\n", usedIngredient.Amount, usedIngredient.Unit, usedIngredient.Name)
+				if usedIngredient.Unit == "" {
+					fmt.Printf("+ %.2f %s\n", usedIngredient.Amount, usedIngredient.Name)
+				} else {
+					fmt.Printf("+ %.2f %s %s\n", usedIngredient.Amount, usedIngredient.Unit, usedIngredient.Name)
+				}
 			}
 		} else {
 			fmt.Println("+ Nothing was used!")
@@ -609,7 +609,11 @@ func printRecipes(recipes []Recipe) {
 		fmt.Println("+ Missing Ingredients:")
 		if len(recipe.MissedIngredients) > 0 {
 			for _, missedIngredient := range recipe.MissedIngredients {
-				fmt.Printf("+ %.2f %s %s\n", missedIngredient.Amount, missedIngredient.Unit, missedIngredient.Name)
+				if missedIngredient.Unit == "" {
+					fmt.Printf("+ %.2f %s\n", missedIngredient.Amount, missedIngredient.Name)
+				} else {
+					fmt.Printf("+ %.2f %s %s\n", missedIngredient.Amount, missedIngredient.Unit, missedIngredient.Name)
+				}
 			}
 		} else {
 			fmt.Println("+ Nothing is missing!")

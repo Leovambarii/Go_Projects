@@ -16,7 +16,7 @@ CREATE TABLE `Recipe`(
     `RecipeId` int UNSIGNED NOT NULL,
     `ArgumentId` int UNSIGNED NOT NULL,
     `Title` text NOT NULL,
-    'Servings' int UNSIGNED NOT NULL,
+    `Servings` int UNSIGNED NOT NULL,
     PRIMARY KEY (`Id`),
     KEY `recipe_argumentid_foreign` (`ArgumentId`),
     CONSTRAINT `recipe_argumentid_foreign` FOREIGN KEY (`ArgumentId`) REFERENCES `ArgumentInput` (`Id`)
