@@ -127,11 +127,11 @@ func main() {
 		printRecipes(recipes)
 
 		// Cache information in database
-		// err = storeRecipesInDatabase(sortedIngredients, recipesNumber, recipes)
-		// if err != nil {
-		// 	fmt.Printf("Error caching data: %v", err)
-		// 	return
-		// }
+		err = storeRecipesInDatabase(sortedIngredients, recipesNumber, recipes)
+		if err != nil {
+			fmt.Printf("Error caching data: %v", err)
+			return
+		}
 	}
 }
 
@@ -226,7 +226,7 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 	defer db.Close()
 
 	// Prepare the SQL statement to select recipe rows with matching InputId
-	stmt, err := db.Prepare("SELECT Id, RecipeId, Title FROM recipe WHERE ArgumentId = ?")
+	stmt, err := db.Prepare("SELECT Id, RecipeId, Title, Servings FROM recipe WHERE ArgumentId = ?")
 	if err != nil {
 		return fmt.Errorf("Could not prepare statement select recipe rows: %v\n", err), recipes
 	}
@@ -243,7 +243,7 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 	for rows.Next() {
 		var recipe Recipe
 		var id int
-		err := rows.Scan(&id, &recipe.Id, &recipe.Title)
+		err := rows.Scan(&id, &recipe.Id, &recipe.Title, &recipe.Servings)
 		if err != nil {
 			return fmt.Errorf("Could not scan row in select recipe rows: %v\n", err), recipes
 		}
@@ -381,14 +381,14 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 	// Loop through the recipe slice and insert all data from each recipe into the database
 	for _, recipe := range recipes {
 		// Prepare the SQL statement insert recipe data
-		stmt, err = db.Prepare("INSERT INTO recipe (RecipeId, ArgumentId, Title) VALUES (?, ?, ?)")
+		stmt, err = db.Prepare("INSERT INTO recipe (RecipeId, ArgumentId, Title, Servings) VALUES (?, ?, ?, ?)")
 		if err != nil {
 			return fmt.Errorf("Could not prepare statement insert recipe data: %v\n", err)
 		}
 		defer stmt.Close()
 
 		// Insert recipe data
-		result, err := stmt.Exec(recipe.Id, argumentInputID, recipe.Title)
+		result, err := stmt.Exec(recipe.Id, argumentInputID, recipe.Title, recipe.Servings)
 		if err != nil {
 			return fmt.Errorf("Could not insert recipe data: %v\n", err)
 		}
@@ -494,6 +494,21 @@ func getRecipes(url string) (error, []Recipe) {
 	return nil, recipes
 }
 
+// getNutritionBulkInfo retrieves nutrition information for a slice of recipes
+// using the Spoonacular API.
+//
+// It makes an API bulk request for all recipes in slice, and updates
+// the Servings, Calories, Carbs, and Proteins fields of each recipe with the corresponding
+// nutrient data from the API response.
+//
+// Args:
+//
+//	apiKeyUrl string: The Spoonacular API key and any additional query parameters.
+//	recipes []Recipe: The list of Recipe structs to retrieve nutrition information for.
+//
+// Returns:
+//
+//	error: An error, if any occurred during the process.
 func getNutritionBulkInfo(apiKeyUrl string, recipes []Recipe) error {
 	// Create a slice of all recipes Ids
 	var recipesIds []string
@@ -545,71 +560,6 @@ func getNutritionBulkInfo(apiKeyUrl string, recipes []Recipe) error {
 
 		// Update the Recipe struct fields with the nutrient values from the API response
 		for _, nutrient := range nutritions[i].Nutrition.Nutrients {
-			// Check if the nutrient name is in the nutrientMap
-			if nutrientPtr, ok := nutrientMap[nutrient.Name]; ok {
-				// If the nutrient name is in the nutrientMap, update the corresponding Recipe struct field
-				*nutrientPtr = nutrient
-			}
-		}
-	}
-
-	return nil
-}
-
-// getNutritionInfo retrieves nutrition information for a slice of recipes
-// using the Spoonacular API.
-//
-// It makes an API request for each recipe in the given list, and updates
-// the Calories, Carbs, and Proteins fields of each recipe with the corresponding
-// nutrient data from the API response.
-//
-// Args:
-//
-//	apiKeyUrl string: The Spoonacular API key and any additional query parameters.
-//	recipes []Recipe: The list of Recipe structs to retrieve nutrition information for.
-//
-// Returns:
-//
-//	error: An error, if any occurred during the process.
-func getNutritionInfo(apiKeyUrl string, recipes []Recipe) error {
-	// Loop through each recipe in slice
-	for i := range recipes {
-		// Construct the API URL for this recipe
-		url := fmt.Sprintf("https://api.spoonacular.com/recipes/%d/information?%s&includeNutrition=true", recipes[i].Id, apiKeyUrl)
-
-		// Make a GET request to the API
-		response, err := http.Get(url)
-		if err != nil {
-			return fmt.Errorf("failed to make request: %v", err)
-		}
-		defer response.Body.Close()
-
-		// Read the response body
-		body, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return fmt.Errorf("failed to read response body: %v", err)
-		}
-
-		type NutritionInfo struct {
-			Nutrition `json:"nutrition"`
-		}
-
-		// Unmarshal the response body into a NutritionInfo struct
-		var nutritions NutritionInfo
-		err = json.Unmarshal(body, &nutritions)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal nutrition information: %v", err)
-		}
-
-		// Map the nutrient names to their corresponding Recipe struct fields
-		var nutrientMap = map[string]*Nutrient{
-			"Calories":      &recipes[i].Calories,
-			"Carbohydrates": &recipes[i].Carbs,
-			"Protein":       &recipes[i].Proteins,
-		}
-
-		// Update the Recipe struct fields with the nutrient values from the API response
-		for _, nutrient := range nutritions.Nutrition.Nutrients {
 			// Check if the nutrient name is in the nutrientMap
 			if nutrientPtr, ok := nutrientMap[nutrient.Name]; ok {
 				// If the nutrient name is in the nutrientMap, update the corresponding Recipe struct field
