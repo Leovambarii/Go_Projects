@@ -74,18 +74,18 @@ func main() {
 	}
 
 	// Check for similar input in database
-	err, foundId := checkForInputInDatabase(sortedIngredients, recipesNumber)
+	err, foundIdx := checkForInputInDatabase(sortedIngredients, recipesNumber)
 	if err != nil {
 		fmt.Printf("Error checking input in database: %v", err)
 		return
 	}
 
 	// Get information from database if similar input exists or get information from api
-	if foundId > 0 {
+	if foundIdx > 0 {
 		fmt.Printf("Input already exists in the database\n\n")
 
 		// Get data from database
-		err, recipes := getDataFromDatabase(foundId)
+		err, recipes := getDataFromDatabase(foundIdx)
 		if err != nil {
 			fmt.Printf("Error getting data from database: %v", err)
 			return
@@ -156,7 +156,7 @@ func sortIngredients(ingredients string) string {
 }
 
 // checkForInputInDatabase searches the input table in the MySQL database for a row that has matching IngredientText and RecipesNumber - values given by the user in the argument flags.
-// It returns an error if any occurred and the Id value of the matching row, or -1 if no row was found/error occurred.
+// It returns an error if any occurred and the idx value of the matching row, or -1 if no row was found/error occurred.
 //
 // Args:
 //
@@ -165,7 +165,7 @@ func sortIngredients(ingredients string) string {
 //
 // Returns:
 //
-//	error, int: An error if any occured and the Id value of the matching row, or -1 if no row was found/error occured.
+//	error, int: An error if any occured and the idx value of the matching row, or -1 if no row was found/error occured.
 func checkForInputInDatabase(ingredients string, recipesNumber int) (error, int) {
 	// Open the database connection
 	db, err := sql.Open(dataDriverName, dataSourceName)
@@ -175,7 +175,7 @@ func checkForInputInDatabase(ingredients string, recipesNumber int) (error, int)
 	defer db.Close()
 
 	// Prepare the SQL statement to select rows with matching IngredientText and RecipesNumber
-	stmt, err := db.Prepare("SELECT Id FROM argumentinput WHERE IngredientText = ? AND RecipesNumber = ?")
+	stmt, err := db.Prepare("SELECT Idx FROM argumentinput WHERE IngredientText = ? AND RecipesNumber = ?")
 	if err != nil {
 		return fmt.Errorf("could not prepare statement: %v", err), -1
 	}
@@ -190,28 +190,28 @@ func checkForInputInDatabase(ingredients string, recipesNumber int) (error, int)
 
 	// Check if any rows were returned
 	if rows.Next() {
-		var id int
-		err = rows.Scan(&id)
+		var idx int
+		err = rows.Scan(&idx)
 		if err != nil {
 			return fmt.Errorf("could not scan row: %v", err), -1
 		}
-		return nil, id
+		return nil, idx
 	} else {
 		return nil, -1
 	}
 }
 
-// getDataFromDatabase function retrieves recipe data from the MySQL database based on the input id.
+// getDataFromDatabase function retrieves recipe data from the MySQL database based on the input idx.
 // If successful, it returns a nil error and a slice of Recipe structs.
 //
 // Args:
 //
-//	InputId int: The id of row with similar input stored in database used to query recipe data from the database.
+//	InputIdx int: The idx of row with similar input stored in database used to query recipe data from the database.
 //
 // Returns:
 //
 //	error, []Recipe: An error if any occured and a slice of Recipe structs.
-func getDataFromDatabase(InputId int) (error, []Recipe) {
+func getDataFromDatabase(InputIdx int) (error, []Recipe) {
 	var recipes []Recipe
 
 	// Open the database connection
@@ -221,15 +221,15 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 	}
 	defer db.Close()
 
-	// Prepare the SQL statement to select recipe rows with matching InputId
-	stmt, err := db.Prepare("SELECT Id, RecipeId, Title, Servings FROM recipe WHERE ArgumentId = ?")
+	// Prepare the SQL statement to select recipe rows with matching InputIdx
+	stmt, err := db.Prepare("SELECT Idx, RecipeId, Title, Servings FROM recipe WHERE ArgumentIdx = ?")
 	if err != nil {
 		return fmt.Errorf("Could not prepare statement select recipe rows: %v\n", err), recipes
 	}
 	defer stmt.Close()
 
 	// Execute the statement with the values passed as arguments
-	rows, err := stmt.Query(InputId)
+	rows, err := stmt.Query(InputIdx)
 	if err != nil {
 		return fmt.Errorf("Could not execute statement select recipe rows: %v\n", err), recipes
 	}
@@ -238,21 +238,21 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 	// Loop through all rows of recipes
 	for rows.Next() {
 		var recipe Recipe
-		var id int
-		err := rows.Scan(&id, &recipe.Id, &recipe.Title, &recipe.Servings)
+		var idx int
+		err := rows.Scan(&idx, &recipe.Id, &recipe.Title, &recipe.Servings)
 		if err != nil {
 			return fmt.Errorf("Could not scan row in select recipe rows: %v\n", err), recipes
 		}
 
-		// Prepare the SQL statement to select used ingredients data with matching id
-		stmt, err := db.Prepare("SELECT IngredientId, Name, Amount, Unit FROM usedingredient WHERE RecipeId = ?")
+		// Prepare the SQL statement to select used ingredients data with matching idx
+		stmt, err := db.Prepare("SELECT IngredientId, Name, Amount, Unit FROM usedingredient WHERE RecipeIdx = ?")
 		if err != nil {
 			return fmt.Errorf("Could not prepare statement select used ingredients rows: %v\n", err), recipes
 		}
 		defer stmt.Close()
 
 		// Execute the statement with the values passed as arguments
-		res, err := stmt.Query(id)
+		res, err := stmt.Query(idx)
 		if err != nil {
 			return fmt.Errorf("Could not execute statement select used ingredients rows: %v\n", err), recipes
 		}
@@ -269,15 +269,15 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 			recipe.UsedIngredients = append(recipe.UsedIngredients, usedIngredient)
 		}
 
-		// Prepare the SQL statement to select missng ingredients data with matching id
-		stmt, err = db.Prepare("SELECT IngredientId, Name, Amount, Unit FROM missingingredient WHERE RecipeId = ?")
+		// Prepare the SQL statement to select missng ingredients data with matching idx
+		stmt, err = db.Prepare("SELECT IngredientId, Name, Amount, Unit FROM missingingredient WHERE RecipeIdx = ?")
 		if err != nil {
 			return fmt.Errorf("Could not prepare statement select missing ingredients rows: %v\n", err), recipes
 		}
 		defer stmt.Close()
 
 		// Execute the statement with the values passed as arguments
-		res, err = stmt.Query(id)
+		res, err = stmt.Query(idx)
 		if err != nil {
 			return fmt.Errorf("Could not execute statement select missing ingredients rows: %v\n", err), recipes
 		}
@@ -294,15 +294,15 @@ func getDataFromDatabase(InputId int) (error, []Recipe) {
 			recipe.MissedIngredients = append(recipe.MissedIngredients, missingIngredient)
 		}
 
-		// Prepare the SQL statement to select nutrients data with matching id
-		stmt, err = db.Prepare("SELECT Name, Amount, Unit FROM nutrients WHERE RecipeId = ?")
+		// Prepare the SQL statement to select nutrients data with matching idx
+		stmt, err = db.Prepare("SELECT Name, Amount, Unit FROM nutrients WHERE RecipeIdx = ?")
 		if err != nil {
 			return fmt.Errorf("Could not prepare statement select nutrients rows: %v\n", err), recipes
 		}
 		defer stmt.Close()
 
 		// Execute the statement with the values passed as arguments
-		res, err = stmt.Query(id)
+		res, err = stmt.Query(idx)
 		if err != nil {
 			return fmt.Errorf("Could not execute statement select nutrients rows: %v\n", err), recipes
 		}
@@ -368,58 +368,58 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 		return fmt.Errorf("Could not insert input data: %v\n", err)
 	}
 
-	// Get the id of the inserted row
-	argumentInputID, err := result.LastInsertId()
+	// Get the idx of the inserted row
+	argumentInputIdx, err := result.LastInsertId()
 	if err != nil {
-		return fmt.Errorf("Could not get id of inserted row input data: %v\n", err)
+		return fmt.Errorf("Could not get idx of inserted row input data: %v\n", err)
 	}
 
 	// Loop through the recipe slice and insert all data from each recipe into the database
 	for _, recipe := range recipes {
 		// Prepare the SQL statement insert recipe data
-		stmt, err = db.Prepare("INSERT INTO recipe (RecipeId, ArgumentId, Title, Servings) VALUES (?, ?, ?, ?)")
+		stmt, err = db.Prepare("INSERT INTO recipe (RecipeId, ArgumentIdx, Title, Servings) VALUES (?, ?, ?, ?)")
 		if err != nil {
 			return fmt.Errorf("Could not prepare statement insert recipe data: %v\n", err)
 		}
 		defer stmt.Close()
 
 		// Insert recipe data
-		result, err := stmt.Exec(recipe.Id, argumentInputID, recipe.Title, recipe.Servings)
+		result, err := stmt.Exec(recipe.Id, argumentInputIdx, recipe.Title, recipe.Servings)
 		if err != nil {
 			return fmt.Errorf("Could not insert recipe data: %v\n", err)
 		}
 
-		// Get the id of the inserted row
-		recipeID, err := result.LastInsertId()
+		// Get the idx of the inserted row
+		recipeIdx, err := result.LastInsertId()
 		if err != nil {
-			return fmt.Errorf("Could not get id of inserted row insert recipe data: %v\n", err)
+			return fmt.Errorf("Could not get idx of inserted row insert recipe data: %v\n", err)
 		}
 
 		// Prepare the SQL statement insert nutrients data
-		stmt, err = db.Prepare("INSERT INTO nutrients (RecipeId, Name, Amount, Unit) VALUES (?, ?, ?, ?)")
+		stmt, err = db.Prepare("INSERT INTO nutrients (RecipeIdx, Name, Amount, Unit) VALUES (?, ?, ?, ?)")
 		if err != nil {
 			return fmt.Errorf("Could not prepare nutrients statement: %v\n", err)
 		}
 		defer stmt.Close()
 
 		// Insert carbs nutrient data
-		_, err = stmt.Exec(recipeID, recipe.Carbs.Name, recipe.Carbs.Amount, recipe.Carbs.Unit)
+		_, err = stmt.Exec(recipeIdx, recipe.Carbs.Name, recipe.Carbs.Amount, recipe.Carbs.Unit)
 		if err != nil {
 			return fmt.Errorf("Could not insert carbs nutrient data: %v\n", err)
 		}
 		// Insert proteins nutrient data
-		_, err = stmt.Exec(recipeID, recipe.Proteins.Name, recipe.Proteins.Amount, recipe.Proteins.Unit)
+		_, err = stmt.Exec(recipeIdx, recipe.Proteins.Name, recipe.Proteins.Amount, recipe.Proteins.Unit)
 		if err != nil {
 			return fmt.Errorf("Could not insert proteins nutrient data: %v\n", err)
 		}
 		// Insert calories nutrient data
-		_, err = stmt.Exec(recipeID, recipe.Calories.Name, recipe.Calories.Amount, recipe.Calories.Unit)
+		_, err = stmt.Exec(recipeIdx, recipe.Calories.Name, recipe.Calories.Amount, recipe.Calories.Unit)
 		if err != nil {
 			return fmt.Errorf("Could not insert calories nutrient data: %v\n", err)
 		}
 
 		// Prepare the SQL statement insert usedingredient data
-		stmt, err = db.Prepare("INSERT INTO usedingredient (IngredientId, RecipeId, Name, Amount, Unit) VALUES (?, ?, ?, ?, ?)")
+		stmt, err = db.Prepare("INSERT INTO usedingredient (IngredientId, RecipeIdx, Name, Amount, Unit) VALUES (?, ?, ?, ?, ?)")
 		if err != nil {
 			return fmt.Errorf("Could not prepare usedingredient statement: %v\n", err)
 		}
@@ -428,14 +428,14 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 		// Insert data of all usedingredients
 		for _, usedIngredient := range recipe.UsedIngredients {
 			// Insert usedigredient data
-			_, err := stmt.Exec(usedIngredient.Id, recipeID, usedIngredient.Name, usedIngredient.Amount, usedIngredient.Unit)
+			_, err := stmt.Exec(usedIngredient.Id, recipeIdx, usedIngredient.Name, usedIngredient.Amount, usedIngredient.Unit)
 			if err != nil {
 				return fmt.Errorf("Could not insert usedingredient data: %v\n", err)
 			}
 		}
 
 		// Prepare the SQL statement insert missingingredient data
-		stmt, err = db.Prepare("INSERT INTO missingingredient (IngredientId, RecipeId, Name, Amount, Unit) VALUES (?, ?, ?, ?, ?)")
+		stmt, err = db.Prepare("INSERT INTO missingingredient (IngredientId, RecipeIdx, Name, Amount, Unit) VALUES (?, ?, ?, ?, ?)")
 		if err != nil {
 			return fmt.Errorf("Could not prepare missingingredient statement: %v\n", err)
 		}
@@ -444,7 +444,7 @@ func storeRecipesInDatabase(ingredients string, recipesNumber int, recipes []Rec
 		// Insert data of all missingingredients
 		for _, missedIngredient := range recipe.MissedIngredients {
 			// Insert missingingredient data
-			_, err := stmt.Exec(missedIngredient.Id, recipeID, missedIngredient.Name, missedIngredient.Amount, missedIngredient.Unit)
+			_, err := stmt.Exec(missedIngredient.Id, recipeIdx, missedIngredient.Name, missedIngredient.Amount, missedIngredient.Unit)
 			if err != nil {
 				return fmt.Errorf("Could not insert missingingredient data: %v\n", err)
 			}

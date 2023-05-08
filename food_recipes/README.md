@@ -47,11 +47,11 @@ Sorts a comma-separated string of ingredients and returns a new comma-separated 
 
 Searches the input table in the MySQL database for a row that has matching IngredientText and RecipesNumber - values given by the user in the argument flags.
 
-It returns an error if any occurred and the Id value of the matching row, or -1 if no row was found/error occurred.
+It returns an error if any occurred and the idx value of the matching row, or -1 if no row was found/error occurred.
 
 ## **getDataFromDatabase**
 
-Retrieves recipe data from the MySQL database based on the input id. If successful, it returns a nil error and a slice of Recipe structs.
+Retrieves recipe data from the MySQL database based on the input idx. If successful, it returns a nil error and a slice of Recipe structs.
 
 ## **storeRecipesInDatabase**
 

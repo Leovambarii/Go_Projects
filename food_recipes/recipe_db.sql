@@ -5,54 +5,54 @@ DROP TABLE IF EXISTS `Recipe`;
 DROP TABLE IF EXISTS `ArgumentInput`;
 
 CREATE TABLE `ArgumentInput`(
-    `Index` int UNSIGNED NOT NULL AUTO_INCREMENT,
+    `Idx` int UNSIGNED NOT NULL AUTO_INCREMENT,
     `IngredientText` text NOT NULL,
     `RecipesNumber` int NOT NULL,
-    PRIMARY KEY (`Index`)
+    PRIMARY KEY (`Idx`)
 );
 
 CREATE TABLE `Recipe`(
-    `Index` int UNSIGNED NOT NULL AUTO_INCREMENT,
+    `Idx` int UNSIGNED NOT NULL AUTO_INCREMENT,
     `RecipeId` int UNSIGNED NOT NULL,
-    `ArgumentId` int UNSIGNED NOT NULL,
+    `ArgumentIdx` int UNSIGNED NOT NULL,
     `Title` text NOT NULL,
     `Servings` int UNSIGNED NOT NULL,
-    PRIMARY KEY (`Index`),
-    KEY `recipe_argumentid_foreign` (`ArgumentId`),
-    CONSTRAINT `recipe_argumentid_foreign` FOREIGN KEY (`ArgumentId`) REFERENCES `ArgumentInput` (`Index`)
+    PRIMARY KEY (`Idx`),
+    KEY `recipe_argumentid_foreign` (`ArgumentIdx`),
+    CONSTRAINT `recipe_argumentid_foreign` FOREIGN KEY (`ArgumentIdx`) REFERENCES `ArgumentInput` (`Idx`)
 );
 
 CREATE TABLE `MissingIngredient`(
-    `Index` int UNSIGNED NOT NULL AUTO_INCREMENT,
+    `Idx` int UNSIGNED NOT NULL AUTO_INCREMENT,
     `IngredientId` int UNSIGNED NOT NULL,
-    `RecipeIndex` int UNSIGNED NOT NULL,
+    `RecipeIdx` int UNSIGNED NOT NULL,
     `Name` text NOT NULL,
     `Amount` double(8, 2) NOT NULL,
     `Unit` text,
-    PRIMARY KEY (`Index`),
-    KEY `missingingredient_recipeid_foreign` (`RecipeIndex`),
-    CONSTRAINT `missingingredient_recipeid_frg` FOREIGN KEY (`RecipeIndex`) REFERENCES `Recipe` (`Index`)
+    PRIMARY KEY (`Idx`),
+    KEY `missingingredient_recipeid_foreign` (`RecipeIdx`),
+    CONSTRAINT `missingingredient_recipeid_frg` FOREIGN KEY (`RecipeIdx`) REFERENCES `Recipe` (`Idx`)
 );
 
 CREATE TABLE `UsedIngredient`(
-    `Index` int UNSIGNED NOT NULL AUTO_INCREMENT,
+    `Idx` int UNSIGNED NOT NULL AUTO_INCREMENT,
     `IngredientId` int UNSIGNED NOT NULL,
-    `RecipeIndex` int UNSIGNED NOT NULL,
+    `RecipeIdx` int UNSIGNED NOT NULL,
     `Name` text NOT NULL,
     `Amount` double(8, 2) NOT NULL,
     `Unit` text,
-    PRIMARY KEY (`Index`),
-    KEY `usedingredient_recipeid_foreign` (`RecipeIndex`),
-    CONSTRAINT `usedingredient_recipeid_frg` FOREIGN KEY (`RecipeIndex`) REFERENCES `Recipe` (`Index`)
+    PRIMARY KEY (`Idx`),
+    KEY `usedingredient_recipeid_foreign` (`RecipeIdx`),
+    CONSTRAINT `usedingredient_recipeid_frg` FOREIGN KEY (`RecipeIdx`) REFERENCES `Recipe` (`Idx`)
 );
 
 CREATE TABLE `Nutrients`(
-    `Index` int UNSIGNED NOT NULL AUTO_INCREMENT,
-    `RecipeIndex` int UNSIGNED NOT NULL,
+    `Idx` int UNSIGNED NOT NULL AUTO_INCREMENT,
+    `RecipeIdx` int UNSIGNED NOT NULL,
     `Name` text NOT NULL,
     `Amount` double(8, 2) NOT NULL,
     `Unit` text NOT NULL,
-    PRIMARY KEY (`Index`),
-    KEY `nutrients_recipeid_foreign` (`RecipeIndex`),
-    CONSTRAINT `nutrients_recipeid_frg` FOREIGN KEY (`RecipeIndex`) REFERENCES `Recipe` (`Index`)
+    PRIMARY KEY (`Idx`),
+    KEY `nutrients_recipeid_foreign` (`RecipeIdx`),
+    CONSTRAINT `nutrients_recipeid_frg` FOREIGN KEY (`RecipeIdx`) REFERENCES `Recipe` (`Idx`)
 );
