@@ -543,22 +543,24 @@ func getNutritionBulkInfo(apiKeyUrl string, recipes []Recipe) error {
 		return fmt.Errorf("failed to unmarshal nutrition information: %v", err)
 	}
 
-	// Loop through each recipe in slice
-	for i := range recipes {
-		recipes[i].Servings = nutritions[i].Servings
+	var nutrientMap = map[string]*Nutrient{
+		"Calories":      nil,
+		"Carbohydrates": nil,
+		"Protein":       nil,
+	}
 
-		// Map the nutrient names to their corresponding Recipe struct fields
-		var nutrientMap = map[string]*Nutrient{
-			"Calories":      &recipes[i].Calories,
-			"Carbohydrates": &recipes[i].Carbs,
-			"Protein":       &recipes[i].Proteins,
-		}
+	// Loop through each recipe in slice
+	for i, nutrition := range nutritions {
+		recipes[i].Servings = nutrition.Servings
+
+		// Update the nutrientMap with the current recipe's nutrient fields
+		nutrientMap["Calories"] = &recipes[i].Calories
+		nutrientMap["Carbohydrates"] = &recipes[i].Carbs
+		nutrientMap["Protein"] = &recipes[i].Proteins
 
 		// Update the Recipe struct fields with the nutrient values from the API response
-		for _, nutrient := range nutritions[i].Nutrition.Nutrients {
-			// Check if the nutrient name is in the nutrientMap
+		for _, nutrient := range nutrition.Nutrition.Nutrients {
 			if nutrientPtr, ok := nutrientMap[nutrient.Name]; ok {
-				// If the nutrient name is in the nutrientMap, update the corresponding Recipe struct field
 				*nutrientPtr = nutrient
 			}
 		}
